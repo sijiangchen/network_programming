@@ -10,6 +10,7 @@ struct User {
 };
 
 struct User users[5];
+int usr_fds[5];
 
 char* GetWordFromDict(int length, char** dict){
     char* ret = dict[rand()%length];
@@ -52,6 +53,8 @@ void Parse(char* fileName, char*** dictionary, int longestWordLength, int* numIt
                 tempDictionary[currentLength] = calloc(strlen(line)+1,1);
                 strcpy(tempDictionary[currentLength],line);
                 currentLength++;
+              //clear up
+                memset(line,'\0',longestWordLength);
         }
         free(line);
         fclose(fp);
@@ -59,8 +62,85 @@ void Parse(char* fileName, char*** dictionary, int longestWordLength, int* numIt
         *dictionary = tempDictionary;
 }
 
-void Message(char* userid, int fd){
 
+/*this function handle each message from the users after they enter the game*/
+void Message(char* userid, int fd, char* word){
+    char* guess_word=calloc(1,1025);
+    for(int itr=0;itr<5;++itr){
+        if(fd==usr_fds[itr]) {
+            username=users[itr].name;
+            break;}
+    }
+    
+    int n=recv(fd, guess_word, 1025, 0);
+    if(n==0){  //disconnected
+        UserDisconnects(username);
+        close(fd);
+    }
+    else{
+        guess_word[strlen(guess_word)-1]='\0';
+        if(strlen(guess_word)!=strlen(word)){ //invalid guess length
+            char mes[64];
+            sprintf(s,"Invalid guess length. The secret word is %lu letter(s)",strlen(word));
+            send(fd,mes,strlen(mes),0);
+        }
+        else{ //valid guess length
+            //correct character
+            char* cmp_word=calloc(1,strlen(word));
+            strcpy(cmp_word,word);
+            int count=0, corr_plcd=0;
+            
+            for(int i=0;i<strlen(guess_word)-1;++i){
+                char* new_cmp_word=calloc(1,strlen(cmp_word));
+                int k=0;
+                for(int j=0;j<strlen(cmp_word);++j){
+                    if(tolower(guess_word[i])==tolower(cmp_word[j])){
+                        count++;
+                    }
+                    else{
+                        new_cmp_word[k]=cmp_word[j];
+                        ++k;
+                    }
+                }
+                free(cmp_word);
+                cmp_word=new_cmp_word;
+            }
+            //correct placed
+            for(int i=0;i<strlen(guess_word)-1;++i){
+  
+                if(tolower(guess_word[i])==tolower(word[i])){
+                    corr_plcd++;
+                }
+            }
+            //if guess the word
+            if(corr_plcd==strlen(word)){
+                char mesg[2048];
+                sprintf(mesg,"%s has correctly guessed the word %s",username,word);
+                for(int itr=0;itr<5;++itr){
+                    if(strcmp(users[itr].name,"")!=0&&usr_fds[itr]!=0){
+                        int n=send(usr_fds[itr],mesg,strlen(mesg),0);
+                        if(n>0){  //disconnected all users
+                            strcpy(users[itr].name, "");
+                            bzero(&usr_fds[itr],sizeof(int));
+                            close(usr_fds[itr]);
+                        }
+                    }
+                }
+            }
+            //if not guess the word
+            else{
+                char mesg[2048];
+                sprintf(mesg,"%s guessed %s: %d letter(s) were correct and %d letter(s) were correctly placed",username,guess_word,count,corr_plcd);
+                for(int itr=0;itr<5;++itr){
+                    if(strcmp(users[itr].name,"")!=0&&usr_fds[itr]!=0){
+                    send(usr_fds[itr],mesg,strlen(mesg),0);
+                }
+            }
+            
+        }
+        
+    }
+    }
 }
 
 /**
@@ -124,6 +204,7 @@ void UserDisconnects(char* username) {
         if (strcmp(users[itr].name, username) == 0) {
             // TODO: Clear out any other necessary user data
             strcpy(users[itr].name, "");
+            bzero(&usr_fds[itr],sizeof(int));
             break;
         }
     }
