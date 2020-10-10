@@ -105,6 +105,7 @@ void Message(char* userid, int fd, char* word){
                 free(cmp_word);
                 cmp_word=new_cmp_word;
             }
+            free(cmp_word);
             //correct placed
             for(int i=0;i<strlen(guess_word)-1;++i){
   
@@ -141,6 +142,7 @@ void Message(char* userid, int fd, char* word){
         
     }
     }
+    free(guess_word);
 }
 
 /**
