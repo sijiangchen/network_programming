@@ -74,10 +74,11 @@ void Parse(char* fileName, char*** dictionary, int longestWordLength, int* numIt
             tempDictionary = realloc(tempDictionary, (currentLength+1)*sizeof(char*));
         }
         tempDictionary[currentLength] = calloc(strlen(line)+1,1);
-        strcpy(tempDictionary[currentLength],line);
+        //make the string lower case
+        for (int i = 0; i < strlen(line); i++){
+            tempDictionary[currentLength][i] = tolower(line[i]);
+        }
         currentLength++;
-        //clear up
-        memset(line,'\0',longestWordLength);
     }
     free(line);
     fclose(fp);
@@ -182,7 +183,7 @@ void Message(int fd, char* word){
                 char* new_cmp_word=calloc(1,strlen(cmp_word));
                 int k=0;
                 for(int j=0;j<strlen(cmp_word);++j){
-                    if(tolower(guess_word[i])==tolower(cmp_word[j])){
+                    if(tolower(guess_word[i])==cmp_word[j]){
                         count++;
                     }
                     else{
@@ -266,7 +267,7 @@ int main(int argc, char* argv[]){
 
     SetParms(argv, &seed, &port, &fileName, &longestWordLength);
     Parse(fileName, &dictionary, longestWordLength, &numItems);
-    //PrintDictionary(numItems, dictionary);  //Here for debugging
+    PrintDictionary(numItems, dictionary);  //Here for debugging
     srand(seed);
     secret_word = GetWordFromDict(numItems, dictionary);
 
