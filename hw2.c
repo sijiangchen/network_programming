@@ -9,12 +9,13 @@
 #include <netinet/in.h>
 
 struct User {
-    char name[1024];
+    char name[64];
 };
 
 struct User users[5];
 int usr_fds[5];
 int num_usr;
+int finished;
 
 /**
  * Get the next word from the dictionary
@@ -61,21 +62,23 @@ void Parse(char* fileName, char*** dictionary, int longestWordLength, int* numIt
     char** tempDictionary;
 
     FILE* fp = fopen(fileName, "r");
-    char* line = calloc(longestWordLength+1, 1);
+    char* line = calloc(1,longestWordLength+1);
     int currentLength = 0;
     if (fp == NULL){
         fprintf(stderr, "Error Opening file\n");
         exit(EXIT_FAILURE);
     }
-    while (fgets(line,longestWordLength+1,fp)) {
+
+    while (fgets(line,longestWordLength+2,fp)) {
         if (currentLength == 0){
             tempDictionary = calloc(1, sizeof(char*));
         }
         else{
             tempDictionary = realloc(tempDictionary, (currentLength+1)*sizeof(char*));
         }
+        
         line[strlen((line))-1]='\0';
-        tempDictionary[currentLength] = calloc(strlen(line),1);
+        tempDictionary[currentLength] = calloc(1,strlen(line)+1);
         strcpy(tempDictionary[currentLength],line);
         currentLength++;
         //clear up
@@ -85,6 +88,8 @@ void Parse(char* fileName, char*** dictionary, int longestWordLength, int* numIt
     fclose(fp);
     *numItems = currentLength;
     *dictionary = tempDictionary;
+
+    
 }
 
 /**
@@ -108,7 +113,8 @@ int UserJoins(int fd, char* username,char* word) {
 
     for (int i = 0; i < 5; ++i) {
         if (strcmp(users[i].name, username)==0) {
-            char mes[2048];
+            char mes[256];
+            memset(mes,'\0',256);
             sprintf(mes,"Username %s is already taken, please enter a different username\n", username);
             send(fd,mes,strlen(mes),0);
             return 0;
@@ -119,12 +125,13 @@ int UserJoins(int fd, char* username,char* word) {
           if(strcmp(users[i].name,"")==0&&usr_fds[i]!=-1){
             strcpy(users[i].name, username);
             //usr_fds[i]=fd;
-            char mes[2048];
+            char mes[128];
+            memset(mes, '\0', 128);
             sprintf(mes,"Let's start playing, %s\n", username);
             send(fd,mes,strlen(mes),0);
             num_usr++;
-            memset(mes, '\0', 2048);
-            sprintf(mes,"There are %d player(s) playing. The secret word is %lu letter(s)\n",num_usr,strlen(word));
+            memset(mes, '\0', 128);
+            sprintf(mes,"There are %d player(s) playing. The secret word is %lu letter(s).\n",num_usr,strlen(word));
             send(fd,mes,strlen(mes),0);
             return 1;
         }
@@ -184,18 +191,19 @@ void Message(int fd, char* word){
         //printf("the guess word is %s\n",guess_word);
         if(strlen(guess_word)!=strlen(word)){ //invalid guess length
             char mes[64];
-            sprintf(mes,"Invalid guess length. The secret word is %lu letter(s)\n",strlen(word));
+            memset(mes,'\0',64);
+            sprintf(mes,"Invalid guess length. The secret word is %lu letter(s).\n",strlen(word));
             send(fd,mes,strlen(mes),0);
         }
         else{ //valid guess length
             //correct character
-            char* cmp_word=calloc(1,strlen(word));
+            char* cmp_word=calloc(1,strlen(word)+1);
             strcpy(cmp_word,word);
             //printf("cmp_word is %s",cmp_word);
             int count=0, corr_plcd=0;
             int isfound;
             for(int i=0;i<strlen(guess_word);++i){
-                char* new_cmp_word=calloc(1,strlen(cmp_word));
+                char* new_cmp_word=calloc(1,strlen(cmp_word)+1);
                 int k=0;
                 isfound=0;
                 for(int j=0;j<strlen(cmp_word);++j){
@@ -221,8 +229,10 @@ void Message(int fd, char* word){
             }
             //if guess the word
             if(corr_plcd==strlen(word)){
-                char mesg[2048];
+                char mesg[128];
+                memset(mesg,'\0',128);
                 sprintf(mesg,"%s has correctly guessed the word %s\n",username,word);
+                finished=1;
                 for(int itr=0;itr<5;++itr){
                     if(strcmp(users[itr].name,"")!=0&&usr_fds[itr]!=-1){
                         int n=send(usr_fds[itr],mesg,strlen(mesg),0);
@@ -236,8 +246,9 @@ void Message(int fd, char* word){
             }
             //if not guess the word
             else{
-                char mesg[2048];
-                sprintf(mesg,"%s guessed %s: %d letter(s) were correct and %d letter(s) were correctly placed\n",username,guess_word,count,corr_plcd);
+                char mesg[256];
+                memset(mesg,'\0',256);
+                sprintf(mesg,"%s guessed %s: %d letter(s) were correct and %d letter(s) were correctly placed.\n",username,guess_word,count,corr_plcd);
                 for(int itr=0;itr<5;++itr){
                     if(strcmp(users[itr].name,"")!=0&&usr_fds[itr]!=0){
                     send(usr_fds[itr],mesg,strlen(mesg),0);
@@ -276,17 +287,12 @@ int main(int argc, char* argv[]){
         return 1;
     }
 
-    // Initialize User structs in users array
-    for (int itr = 0; itr < 5; ++itr) {
-        // Include any other necessary user data
-        strcpy(users[itr].name, "");
-    }
 
     SetParms(argv, &seed, &port, &fileName, &longestWordLength);
     Parse(fileName, &dictionary, longestWordLength, &numItems);
     //PrintDictionary(numItems, dictionary);  //Here for debugging
     srand(seed);
-    secret_word = GetWordFromDict(numItems, dictionary);
+    //secret_word = GetWordFromDict(numItems, dictionary);
 
     sockfd = socket(PF_INET, SOCK_STREAM, 0);
     //printf("%s",secret_word); //Here for debugging
@@ -296,7 +302,6 @@ int main(int argc, char* argv[]){
         return 1;
     }
     bzero(&servaddr, sizeof(servaddr));
-    num_usr=0;
     // assign IP, PORT
     servaddr.sin_family = PF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -315,9 +320,19 @@ int main(int argc, char* argv[]){
         FreeDictionary(numItems, &dictionary);
         return 1;
     }
+    while(1){
+    // Initialize User structs in users array
+    for (int itr = 0; itr < 5; ++itr) {
+        // Include any other necessary user data
+        strcpy(users[itr].name, "");
+    }
+    secret_word = GetWordFromDict(numItems, dictionary);
+    num_usr=0;
     fd_set select_fds;
+    finished=0;
     for (int i = 0; i < 5; ++i) usr_fds[i] = -1;
-    while (1) { // need an ender?
+    
+    while (!finished) { // need an ender?
         int largest_fd = 0;
         
         FD_ZERO(&select_fds);
@@ -358,6 +373,7 @@ int main(int argc, char* argv[]){
             }
            
                 char mes[64];
+                memset(mes,'\0',64);
                 sprintf(mes,"Welcome to Guess the Word, please enter your username.\n");
                 send(client_fd,mes,strlen(mes),0);
                        
@@ -367,8 +383,9 @@ int main(int argc, char* argv[]){
         for (int i = 0; i < 5; ++i) {
             if (usr_fds[i] != -1 && FD_ISSET(usr_fds[i], &select_fds)) {
                 if (strcmp(users[i].name, "") == 0) { // waiting for username
-                    char username[1025];
-                    int n = recv(usr_fds[i], username, 1025, 0);
+                    char username[64];
+                    memset(username,'\0',64);
+                    int n = recv(usr_fds[i], username, 64, 0);
                     if (n == 0) { // user disconnected before sending username
                         usr_fds[i] = -1;
                         close(usr_fds[i]);
@@ -387,7 +404,7 @@ int main(int argc, char* argv[]){
             }
         }
     }
-
+    }
     FreeDictionary(numItems, &dictionary);
     return 0;
 }
