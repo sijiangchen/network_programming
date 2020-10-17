@@ -125,7 +125,6 @@ int UserJoins(int fd, char* username,char* word) {
     for (int i = 0; i < 5; ++i) {
           if(strcmp(users[i].name,"")==0&&usr_fds[i]!=-1){
             strcpy(users[i].name, username);
-            //usr_fds[i]=fd;
             char mes[128];
             memset(mes, '\0', 128);
             sprintf(mes,"Let's start playing, %s\n", username);
@@ -155,7 +154,6 @@ void UserDisconnects(char* username) {
     
     for (int itr = 0; itr < 5; ++itr) {
         if (strcmp(users[itr].name, username) == 0) {
-            // TODO: Clear out any other necessary user data
             strcpy(users[itr].name, "");
             usr_fds[itr] = -1;
             num_usr--;
@@ -183,7 +181,6 @@ void Message(int fd, char* word){
     
     int n=recv(fd, guess_word, 1025, 0);
     if(n==0){  //disconnected
-        //printf("i am here!\n");
         UserDisconnects(username);
         close(fd);
     }
@@ -333,7 +330,7 @@ int main(int argc, char* argv[]){
         finished=0;
         for (int i = 0; i < 5; ++i) usr_fds[i] = -1;
         
-        while (!finished) { // need an ender?
+        while (!finished) { 
             int largest_fd = 0;
             
             FD_ZERO(&select_fds);
@@ -347,9 +344,9 @@ int main(int argc, char* argv[]){
                     }
                 }
             }
-            //printf("waiting on select for fds, largest: %d...\n", largest_fd);
+            //printf("waiting on select for fds, largest: %d...\n", largest_fd); here for debugging
             int result = select(largest_fd + 1, &select_fds, NULL, NULL, NULL);
-            //printf("select completed with %d results\n", result);
+            //printf("select completed with %d results\n", result); here fore debugging
             if (result == -1) {
                 fprintf(stderr, "Select failed\n");
                 FreeDictionary(numItems, &dictionary);
@@ -364,7 +361,7 @@ int main(int argc, char* argv[]){
                     return 1;
                 }
                 
-                //bool set_usr_fd = false;
+                
                 for (int i = 0; i < 5; ++i) {
                     if (usr_fds[i] == -1) {
                         usr_fds[i] = client_fd;
@@ -378,7 +375,7 @@ int main(int argc, char* argv[]){
                     sprintf(mes,"Welcome to Guess the Word, please enter your username.\n");
                     send(client_fd,mes,strlen(mes),0);
                            
-                       }
+           }
 
         
             for (int i = 0; i < 5; ++i) {
@@ -396,10 +393,11 @@ int main(int argc, char* argv[]){
                             username[strlen(username)-1]='\0';
                             UserJoins(usr_fds[i], username,secret_word);
                         }
-                    } else { // waiting for message
+                    }
+                    else { // waiting for message
                                 // user sent a message
-                                    Message(usr_fds[i], secret_word);
-                                }
+                            Message(usr_fds[i], secret_word);
+                    }
                             
                     
                 }
