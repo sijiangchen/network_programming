@@ -86,6 +86,7 @@ void Parse(char* fileName, char*** dictionary, int longestWordLength, int* numIt
     }
     free(line);
     fclose(fp);
+    //add items for return
     *numItems = currentLength;
     *dictionary = tempDictionary;
 
@@ -321,90 +322,91 @@ int main(int argc, char* argv[]){
         return 1;
     }
     while(1){
-    // Initialize User structs in users array
-    for (int itr = 0; itr < 5; ++itr) {
-        // Include any other necessary user data
-        strcpy(users[itr].name, "");
-    }
-    secret_word = GetWordFromDict(numItems, dictionary);
-    num_usr=0;
-    fd_set select_fds;
-    finished=0;
-    for (int i = 0; i < 5; ++i) usr_fds[i] = -1;
-    
-    while (!finished) { // need an ender?
-        int largest_fd = 0;
+        // Initialize User structs in users array
+        for (int itr = 0; itr < 5; ++itr) {
+            // Include any other necessary user data
+            strcpy(users[itr].name, "");
+        }
+        secret_word = GetWordFromDict(numItems, dictionary);
+        num_usr=0;
+        fd_set select_fds;
+        finished=0;
+        for (int i = 0; i < 5; ++i) usr_fds[i] = -1;
         
-        FD_ZERO(&select_fds);
-        FD_SET(sockfd, &select_fds);
-        largest_fd = sockfd;
-        for (int i = 0; i < 5; ++i) {
-            if (usr_fds[i] != -1) {
-                FD_SET(usr_fds[i], &select_fds);
-                if (usr_fds[i] > largest_fd) {
-                    largest_fd = usr_fds[i];
+        while (!finished) { // need an ender?
+            int largest_fd = 0;
+            
+            FD_ZERO(&select_fds);
+            FD_SET(sockfd, &select_fds);
+            largest_fd = sockfd;
+            for (int i = 0; i < 5; ++i) {
+                if (usr_fds[i] != -1) {
+                    FD_SET(usr_fds[i], &select_fds);
+                    if (usr_fds[i] > largest_fd) {
+                        largest_fd = usr_fds[i];
+                    }
                 }
             }
-        }
-        //printf("waiting on select for fds, largest: %d...\n", largest_fd);
-        int result = select(largest_fd + 1, &select_fds, NULL, NULL, NULL);
-        //printf("select completed with %d results\n", result);
-        if (result == -1) {
-            fprintf(stderr, "Select failed\n");
-            FreeDictionary(numItems, &dictionary);
-            return 1;
-        }
-        if (num_usr<5&&FD_ISSET(sockfd, &select_fds)) {
-            // user connecting to server, accept the connection
-            int client_fd = accept(sockfd, NULL, NULL);
-            if (client_fd < 0) {
-                fprintf(stderr, "Accept failed\n");
+            //printf("waiting on select for fds, largest: %d...\n", largest_fd);
+            int result = select(largest_fd + 1, &select_fds, NULL, NULL, NULL);
+            //printf("select completed with %d results\n", result);
+            if (result == -1) {
+                fprintf(stderr, "Select failed\n");
                 FreeDictionary(numItems, &dictionary);
                 return 1;
             }
-            
-            //bool set_usr_fd = false;
-            for (int i = 0; i < 5; ++i) {
-                if (usr_fds[i] == -1) {
-                    usr_fds[i] = client_fd;
-                    //set_usr_fd = true;
-                    break;
+            if (num_usr<5&&FD_ISSET(sockfd, &select_fds)) {
+                // user connecting to server, accept the connection
+                int client_fd = accept(sockfd, NULL, NULL);
+                if (client_fd < 0) {
+                    fprintf(stderr, "Accept failed\n");
+                    FreeDictionary(numItems, &dictionary);
+                    return 1;
                 }
-            }
-           
-                char mes[64];
-                memset(mes,'\0',64);
-                sprintf(mes,"Welcome to Guess the Word, please enter your username.\n");
-                send(client_fd,mes,strlen(mes),0);
-                       
-                   }
-
-    
-        for (int i = 0; i < 5; ++i) {
-            if (usr_fds[i] != -1 && FD_ISSET(usr_fds[i], &select_fds)) {
-                if (strcmp(users[i].name, "") == 0) { // waiting for username
-                    char username[64];
-                    memset(username,'\0',64);
-                    int n = recv(usr_fds[i], username, 64, 0);
-                    if (n == 0) { // user disconnected before sending username
-                        usr_fds[i] = -1;
-                        close(usr_fds[i]);
-                    } else {
-                        //strcpy(users[i].name, username);
-                        //printf("username is %s",username);
-                        username[strlen(username)-1]='\0';
-                        UserJoins(usr_fds[i], username,secret_word);
-                    }
-                } else { // waiting for message
-                            // user sent a message
-                                Message(usr_fds[i], secret_word);
-                            }
-                        
                 
+                //bool set_usr_fd = false;
+                for (int i = 0; i < 5; ++i) {
+                    if (usr_fds[i] == -1) {
+                        usr_fds[i] = client_fd;
+                        //set_usr_fd = true;
+                        break;
+                    }
+                }
+               
+                    char mes[64];
+                    memset(mes,'\0',64);
+                    sprintf(mes,"Welcome to Guess the Word, please enter your username.\n");
+                    send(client_fd,mes,strlen(mes),0);
+                           
+                       }
+
+        
+            for (int i = 0; i < 5; ++i) {
+                if (usr_fds[i] != -1 && FD_ISSET(usr_fds[i], &select_fds)) {
+                    if (strcmp(users[i].name, "") == 0) { // waiting for username
+                        char username[64];
+                        memset(username,'\0',64);
+                        int n = recv(usr_fds[i], username, 64, 0);
+                        if (n == 0) { // user disconnected before sending username
+                            usr_fds[i] = -1;
+                            close(usr_fds[i]);
+                        } else {
+                            //strcpy(users[i].name, username);
+                            //printf("username is %s",username);
+                            username[strlen(username)-1]='\0';
+                            UserJoins(usr_fds[i], username,secret_word);
+                        }
+                    } else { // waiting for message
+                                // user sent a message
+                                    Message(usr_fds[i], secret_word);
+                                }
+                            
+                    
+                }
             }
         }
     }
-    }
+    //free the used memory
     FreeDictionary(numItems, &dictionary);
     return 0;
 }
