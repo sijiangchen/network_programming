@@ -1,0 +1,2 @@
+Base1 4.65 2.96 4 Base2 Base6 Base8 Base12
+Base8 1.62 8.12 4 Base2 Base1 Base9 Base12
